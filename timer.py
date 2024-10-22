@@ -19,28 +19,29 @@ import os
 INACTIVE_TIMEOUT: int = 60 * 3      # 3 minutes before counted as inactive
 CHECK_INTERVAL: int = 10            # 10 seconds between checking if still working
 
-start_time_s: int = None            # start timestamp in epoch seconds to begin counting from (resets after each inactivity)
+start_time_s: int = None            # start timestamp in epoch seconds to begin counting from (resets after each check-intervall)
 last_activity_s: int = None         # timestamp of last activity in epoch seconds
 
 total_time_s: int = None            # total time spend in project since opening file (minus inactivity)
 
 currently_active: bool = None
 
-SAVE_FILE_NAME: str = 'log.json'
+LOG_FILE_NAME: str = 'log.json'
 blend_file_name: str = None
 
 def save_working_time_to_json() -> None:
     """ load log file, add new elapsed time and save """
     global start_time_s, last_activity_s
-    global blend_file_name, SAVE_FILE_NAME
+    global blend_file_name, LOG_FILE_NAME
     global currently_active
 
     # abort if currently inactive (else the counter would increase while actually inactive)
     if not currently_active:
         return
 
-    log_file_path: str = os.join( os.getcwd(), SAVE_FILE_NAME )
+    log_file_path: str = os.path.join( os.getcwd(), LOG_FILE_NAME )
     log_file: dict = None
+    os.path.
 
     # create logfile if not existis
     if not os.path.exists( log_file_path ):
@@ -99,26 +100,56 @@ def save_working_time_to_json() -> None:
     # save updated file
     with open( log_file_path, 'w' ) as fp:
         json.dump( log_file, fp, indent=4 )
+    print('saved log:', log_file_path)
 
 def update_timer() -> int:
     """
     gets called every x seconds (CHECK_INTERVAL)
-    and calls for the redrawing of the timer and the saving of the logfile
+    and updates the time variables, the inactivity state and calls for the saving of the logfile
     @return: the number of seconds until next call of this function 
     """
-    global CHECK_INTERVAL, INACTIVE_TIMEOUT
-    global last_activity_s
+    global CHECK_INTERVAL, INACTIVE_TIMEOUT, currently_active
+    global last_activity_s, start_time_s, total_time_s
 
     # fetch current time as epoch timestamp on seoconds
     current_time_s: int = int( time.time() )
 
-    # time of inactivity longer than timeout 
+    # if inactive nothing needs to be updated
+    if not currently_active:
+        return CHECK_INTERVAL
+    
+    total_time_s += last_activity_s - start_time_s
+    print(total_time_s, currently_active)
+
+    # if active but time of inactivity longer than timeout set to inactive
     if last_activity_s + current_time_s > INACTIVE_TIMEOUT:
-        ...
-        
+        currently_active = False
+        last_activity_s = None
+        start_time_s = None
+        return CHECK_INTERVAL
+    
+    start_time_s = current_time_s
 
     return CHECK_INTERVAL
 
+def track_activity(context) -> None:
+    """
+    is called when an event happens
+    resets the last_activity_s time
+    """
+    global last_activity_s, currently_active, start_time_s
+
+    # reset last_activity time
+    current_time_s = int( time.time() )
+    last_activity_s = current_time_s
+    
+    # save timer state
+    save_working_time_to_json()
+
+    # if officially in inactive state, set to active
+    if not currently_active:
+        currently_active = True
+        start_time_s = current_time_s
 
 def ui_draw_elapsed_time(self, context) -> None:
     """draws the currently elapsed time to the Blender UI"""
@@ -143,6 +174,8 @@ def register():
     total_time_s = 0
     last_activity_s = start_time_s
     currently_active = True
+    
+    save_working_time_to_json()
 
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
