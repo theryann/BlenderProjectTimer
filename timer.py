@@ -16,15 +16,14 @@ import json
 import time
 import os
 
-INACTIVE_TIMEOUT: int = 60 * 3      # 3 minutes before counted as inactive
-CHECK_INTERVAL: int = 1            # 10 seconds between checking if still working
+INACTIVE_TIMEOUT: int = 60 * .5     # 3 minutes before counted as inactive
+CHECK_INTERVAL: int = 1             # 10 seconds between checking if still working
 
-session_start_time_s: int           # epoch second when "session" was started (only resets after inactivity) 
-start_time_s: int = None            # epoch second to begin counting from (resets after each check-intervall)
-last_activity_s: int = None         # timestamp of last activity in epoch seconds
+session_start_epoch: int            # epoch second when "session" was started (only resets after inactivity) 
+sprint_start_epoch: int = None      # epoch second to begin counting from (resets after each check-intervall)
+last_activity_epoch: int = None     # timestamp of last activity in epoch seconds
 
-total_time_s: int = None            # total time spend in project since opening file (minus inactivity)
-
+session_time_s: int = None          # total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
 
 currently_active: bool = None
 
@@ -34,7 +33,7 @@ blend_file_dir: str = None
 
 def save_working_time_to_json() -> None:
     """ load log file, add new elapsed time and save """
-    global start_time_s, last_activity_s, session_start_time_s
+    global sprint_start_epoch, last_activity_epoch, session_start_epoch
     global blend_file_name, blend_file_dir, LOG_FILE_NAME
     global currently_active
 
@@ -43,7 +42,7 @@ def save_working_time_to_json() -> None:
         return
     
     # abort if no filename/directoryname is known (where should it even be saved?)
-    # this means the blendfile is not saved yet
+    # the reasons for this is that the blendfile is not saved yet
     if not blend_file_name:
         return
 
@@ -56,7 +55,7 @@ def save_working_time_to_json() -> None:
             json.dump({
                 "total_minutes": 0,
                 "individual_files": {},
-                "all_sessions": []
+                "all_sprints": []
             },
             fp, indent=4)
     
@@ -64,35 +63,35 @@ def save_working_time_to_json() -> None:
     with open( log_file_path, 'r' ) as fp:
         log_file = json.load( fp )
 
-    elapsed_time_s: int = last_activity_s - start_time_s
+    elapsed_time_s: int = last_activity_epoch - sprint_start_epoch
 
     if elapsed_time_s == 0:
         return
 
     elapsed_time_minutes: int = elapsed_time_s / 60
-    begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( session_start_time_s ))
-    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( session_start_time_s + elapsed_time_s ))
+    begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( sprint_start_epoch ))
+    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( sprint_start_epoch + elapsed_time_s ))
 
-    # update currents session elapsed time if it's already recorded
-    # "session recorded" means the begin_string
-    curr_session_found = False
+    # update currents sprint elapsed time if it's already recorded
+    # "sprint recorded" means the begin_string is in the list of sprints
+    curr_sprint_found: bool = False 
     
-    for i, session in enumerate(log_file["all_sessions"]):
-        if not session.get("file") == blend_file_name:
+    for i, sprint in enumerate(log_file["all_sprints"]):
+        if not sprint.get("file") == blend_file_name:
             continue
-        if not session.get("starttime") == begin_string:
+        if not sprint.get("starttime") == begin_string:
             continue
 
         # begin_string found => so replace time elapsed
-        log_file["all_sessions"][i]["endtime"] = end_string
-        log_file["all_sessions"][i]["minutes_elapsed"] = elapsed_time_minutes
+        log_file["all_sprints"][i]["endtime"] = end_string
+        log_file["all_sprints"][i]["minutes_elapsed"] = elapsed_time_minutes
 
-        curr_session_found = True
+        curr_sprint_found = True
         break
 
-    # add current session to list of all sessions since it's not recorded yet
-    if not curr_session_found:
-        log_file["all_sessions"].append({
+    # add current sprint to list of all sprints since it's not recorded yet
+    if not curr_sprint_found:
+        log_file["all_sprints"].append({
             "file": blend_file_name,
             "starttime": begin_string,
             "endtime": end_string,
@@ -101,13 +100,13 @@ def save_working_time_to_json() -> None:
 
     # add elapsed time to counter of this blend file
     # and sum all files to new total time
-    # calculate this from the list of session (because this save function is called periodically i can not just add to the counter)
-    sum_sessions_durations_min: float = sum([
+    # calculate this from the list of sprint (because this save function is called periodically i can not just add to the counter)
+    sum_sprints_durations_min: float = sum([
         sess.get("minutes_elapsed")
-        for sess in log_file["all_sessions"]
+        for sess in log_file["all_sprints"]
         if sess["file"] == blend_file_name
     ])
-    log_file["individual_files"][blend_file_name] = sum_sessions_durations_min
+    log_file["individual_files"][blend_file_name] = sum_sprints_durations_min
 
     # if blend_file_name in log_file.get("individual_files"):
     #     log_file["individual_files"][blend_file_name] += elapsed_time_minutes
@@ -127,7 +126,7 @@ def update_timer() -> int:
     @return: the number of seconds until next call of this function 
     """
     global CHECK_INTERVAL, INACTIVE_TIMEOUT, currently_active
-    global last_activity_s, start_time_s, total_time_s
+    global last_activity_epoch, sprint_start_epoch, session_time_s
 
     # fetch current time as epoch timestamp on seoconds
     current_time_s: int = int( time.time() )
@@ -136,32 +135,32 @@ def update_timer() -> int:
     if not currently_active:
         return CHECK_INTERVAL
     
-    total_time_s += last_activity_s - start_time_s
-    print('total:', total_time_s, 'active:', currently_active, 'start:', start_time_s, 'last:', last_activity_s)
+    session_time_s = last_activity_epoch - sprint_start_epoch
+    # print('total:', session_time_s, 'active:', currently_active, 'start:', sprint_start_epoch, 'last:', last_activity_epoch)
 
     # if active but time of inactivity longer than timeout set to inactive
-    if last_activity_s - start_time_s > INACTIVE_TIMEOUT:
+    if current_time_s - sprint_start_epoch > INACTIVE_TIMEOUT:
         currently_active = False
-        last_activity_s = None
-        start_time_s = None
+        last_activity_epoch = None
+        sprint_start_epoch = None
         return CHECK_INTERVAL
     
-    # last_activity_s = current_time_s
+    # last_activity_epoch = current_time_s
 
     return CHECK_INTERVAL
 
 def track_activity(context) -> None:
     """
     is called when an event happens
-    resets the last_activity_s time
+    resets the last_activity_epoch time
     """
-    global last_activity_s, currently_active, start_time_s
+    global last_activity_epoch, currently_active, sprint_start_epoch, session_start_epoch
 
     # reset last_activity time
     current_time_s = int( time.time() )
-    last_activity_s = current_time_s
+    last_activity_epoch = current_time_s
 
-    print('activity', last_activity_s)
+    print('activity', last_activity_epoch)
     
     # save timer state
     save_working_time_to_json()
@@ -169,17 +168,18 @@ def track_activity(context) -> None:
     # if officially in inactive state, set to active
     if not currently_active:
         currently_active = True
-        start_time_s = current_time_s
+        sprint_start_epoch = current_time_s # start new sprint
+        # session_start_epoch = current_time_s
 
 def ui_draw_elapsed_time(self, context) -> None:
     """draws the currently elapsed time to the Blender UI"""
-    global total_time_s
-    minutes, seconds = divmod(total_time_s, 60)
+    global session_time_s
+    minutes, seconds = divmod(session_time_s, 60)
     self.layout.label(text=f"{minutes:02}:{seconds:02} min")
 
 
 def register():
-    global start_time_s, total_time_s, last_activity_s, currently_active, session_start_time_s
+    global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
     global blend_file_name, blend_file_dir
 
     # bpy.utils.register_class(TIME_OT_reset)
@@ -191,10 +191,12 @@ def register():
     bpy.app.timers.register( update_timer )
 
     # initalize time variables
-    start_time_s = int( time.time() )
-    session_start_time_s = start_time_s
-    total_time_s = 0
-    last_activity_s = start_time_s
+    curr_time: int = int( time.time() )
+
+    session_start_epoch = curr_time
+    sprint_start_epoch  = curr_time
+    last_activity_epoch = curr_time
+    session_time_s = 0
     currently_active = True
 
     blend_file_path: str = bpy.data.filepath
