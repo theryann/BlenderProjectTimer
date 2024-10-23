@@ -65,7 +65,9 @@ def save_working_time_to_json() -> None:
     with open( log_file_path, 'r' ) as fp:
         log_file = json.load( fp )
 
-    elapsed_time_s: int = last_activity_epoch - sprint_start_epoch
+    # use current time since it counts as active time
+    # but wouldn't it update if the last activity was before the the last time this saving function was called
+    elapsed_time_s: int = round( int( time.time() ) - sprint_start_epoch, 2 )
 
     if elapsed_time_s == 0:
         return SAVE_INTERVAL
@@ -136,7 +138,7 @@ def update_timer() -> int:
     
     # use the current time for session timer (the UI element) since it also counts as active time
     # (inactivity returns this function earlier)
-    session_time_s = current_time_s - session_start_epoch 
+    session_time_s += TIMER_UPDATE_INTERVAL
 
     # if active but time of inactivity longer than timeout set to inactive
     if current_time_s - last_activity_epoch > INACTIVE_TIMEOUT:
@@ -193,7 +195,6 @@ def render_start(scene) -> None:
         sprint_start_epoch = current_epoch
     if not currently_active:
         currently_active = True
-
 
 def render_complete(scene) -> None:
     global currently_rendering, last_activity_epoch
