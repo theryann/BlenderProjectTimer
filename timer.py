@@ -17,12 +17,14 @@ import time
 import os
 
 INACTIVE_TIMEOUT: int = 60 * 3      # 3 minutes before counted as inactive
-CHECK_INTERVAL: int = 10            # 10 seconds between checking if still working
+CHECK_INTERVAL: int = 1            # 10 seconds between checking if still working
 
-start_time_s: int = None            # start timestamp in epoch seconds to begin counting from (resets after each check-intervall)
+session_start_time_s: int           # epoch second when "session" was started (only resets after inactivity) 
+start_time_s: int = None            # epoch second to begin counting from (resets after each check-intervall)
 last_activity_s: int = None         # timestamp of last activity in epoch seconds
 
 total_time_s: int = None            # total time spend in project since opening file (minus inactivity)
+
 
 currently_active: bool = None
 
@@ -32,7 +34,7 @@ blend_file_dir: str = None
 
 def save_working_time_to_json() -> None:
     """ load log file, add new elapsed time and save """
-    global start_time_s, last_activity_s
+    global start_time_s, last_activity_s, session_start_time_s
     global blend_file_name, blend_file_dir, LOG_FILE_NAME
     global currently_active
 
@@ -63,9 +65,13 @@ def save_working_time_to_json() -> None:
         log_file = json.load( fp )
 
     elapsed_time_s: int = last_activity_s - start_time_s
+
+    if elapsed_time_s == 0:
+        return
+
     elapsed_time_minutes: int = elapsed_time_s / 60
-    begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( start_time_s ))
-    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( start_time_s + elapsed_time_s ))
+    begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( session_start_time_s ))
+    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( session_start_time_s + elapsed_time_s ))
 
     # update currents session elapsed time if it's already recorded
     # "session recorded" means the begin_string
@@ -95,18 +101,24 @@ def save_working_time_to_json() -> None:
 
     # add elapsed time to counter of this blend file
     # and sum all files to new total time
+    # calculate this from the list of session (because this save function is called periodically i can not just add to the counter)
+    sum_sessions_durations_min: float = sum([
+        sess.get("minutes_elapsed")
+        for sess in log_file["all_sessions"]
+        if sess["file"] == blend_file_name
+    ])
+    log_file["individual_files"][blend_file_name] = sum_sessions_durations_min
 
-    if blend_file_name in log_file.get("individual_files"):
-        log_file["individual_files"][blend_file_name] += elapsed_time_minutes
-    else:
-        log_file["individual_files"][blend_file_name]  = elapsed_time_minutes
+    # if blend_file_name in log_file.get("individual_files"):
+    #     log_file["individual_files"][blend_file_name] += elapsed_time_minutes
+    # else:
+    #     log_file["individual_files"][blend_file_name]  = elapsed_time_minutes
     
     log_file["total_minutes"] = sum( log_file.get("individual_files").values() )
     
     # save updated file
     with open( log_file_path, 'w' ) as fp:
         json.dump( log_file, fp, indent=4 )
-    print('saved log:', log_file_path)
 
 def update_timer() -> int:
     """
@@ -125,16 +137,16 @@ def update_timer() -> int:
         return CHECK_INTERVAL
     
     total_time_s += last_activity_s - start_time_s
-    print(total_time_s, currently_active)
+    print('total:', total_time_s, 'active:', currently_active, 'start:', start_time_s, 'last:', last_activity_s)
 
     # if active but time of inactivity longer than timeout set to inactive
-    if last_activity_s + current_time_s > INACTIVE_TIMEOUT:
+    if last_activity_s - start_time_s > INACTIVE_TIMEOUT:
         currently_active = False
         last_activity_s = None
         start_time_s = None
         return CHECK_INTERVAL
     
-    start_time_s = current_time_s
+    # last_activity_s = current_time_s
 
     return CHECK_INTERVAL
 
@@ -148,6 +160,8 @@ def track_activity(context) -> None:
     # reset last_activity time
     current_time_s = int( time.time() )
     last_activity_s = current_time_s
+
+    print('activity', last_activity_s)
     
     # save timer state
     save_working_time_to_json()
@@ -161,11 +175,11 @@ def ui_draw_elapsed_time(self, context) -> None:
     """draws the currently elapsed time to the Blender UI"""
     global total_time_s
     minutes, seconds = divmod(total_time_s, 60)
-    self.layout.label(text=f"{minutes:2}:{seconds:2}")
+    self.layout.label(text=f"{minutes:02}:{seconds:02} min")
 
 
 def register():
-    global start_time_s, total_time_s, last_activity_s, currently_active
+    global start_time_s, total_time_s, last_activity_s, currently_active, session_start_time_s
     global blend_file_name, blend_file_dir
 
     # bpy.utils.register_class(TIME_OT_reset)
@@ -178,6 +192,7 @@ def register():
 
     # initalize time variables
     start_time_s = int( time.time() )
+    session_start_time_s = start_time_s
     total_time_s = 0
     last_activity_s = start_time_s
     currently_active = True
@@ -188,7 +203,7 @@ def register():
         blend_file_dir  = os.path.dirname(  blend_file_path )
         blend_file_name = os.path.basename( blend_file_path )
     
-    save_working_time_to_json()
+    # save_working_time_to_json()
 
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
@@ -200,4 +215,8 @@ def unregister():
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
 
 if __name__ == '__main__':
+    try:
+        unregister()
+    except Exception as e:
+        print('unregistering failed', e)
     register()
