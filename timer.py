@@ -28,20 +28,25 @@ currently_active: bool = None
 
 LOG_FILE_NAME: str = 'log.json'
 blend_file_name: str = None
+blend_file_dir: str = None
 
 def save_working_time_to_json() -> None:
     """ load log file, add new elapsed time and save """
     global start_time_s, last_activity_s
-    global blend_file_name, LOG_FILE_NAME
+    global blend_file_name, blend_file_dir, LOG_FILE_NAME
     global currently_active
 
     # abort if currently inactive (else the counter would increase while actually inactive)
     if not currently_active:
         return
+    
+    # abort if no filename/directoryname is known (where should it even be saved?)
+    # this means the blendfile is not saved yet
+    if not blend_file_name:
+        return
 
-    log_file_path: str = os.path.join( os.getcwd(), LOG_FILE_NAME )
+    log_file_path: str = os.path.join( blend_file_dir, LOG_FILE_NAME )
     log_file: dict = None
-    os.path.
 
     # create logfile if not existis
     if not os.path.exists( log_file_path ):
@@ -160,6 +165,7 @@ def ui_draw_elapsed_time(self, context) -> None:
 
 def register():
     global start_time_s, total_time_s, last_activity_s, currently_active
+    global blend_file_name, blend_file_dir
 
     # bpy.utils.register_class(TIME_OT_reset)
 
@@ -174,6 +180,12 @@ def register():
     total_time_s = 0
     last_activity_s = start_time_s
     currently_active = True
+
+    blend_file_path: str = bpy.data.filepath
+
+    if blend_file_path:
+        blend_file_dir  = os.path.dirname(  blend_file_path )
+        blend_file_name = os.path.basename( blend_file_path )
     
     save_working_time_to_json()
 
