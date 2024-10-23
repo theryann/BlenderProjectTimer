@@ -16,8 +16,9 @@ import json
 import time
 import os
 
-INACTIVE_TIMEOUT: int = 60 * .5     # 3 minutes before counted as inactive
-CHECK_INTERVAL: int = 1             # 10 seconds between checking if still working
+INACTIVE_TIMEOUT: int = 60 * 3      # seconds before counted as inactive (3 minutes)
+CHECK_INTERVAL: int = 1             # number of seconds between checking if still working (=active)
+SAVE_INTERVAL: int  = 10            # "activities" can occurr very fast in succession. It suffices to save in time intervalls (seconds) defined by this constants
 
 session_start_epoch: int            # epoch second when "session" was started (only resets after inactivity) 
 sprint_start_epoch: int = None      # epoch second to begin counting from (resets after each check-intervall)
@@ -108,11 +109,6 @@ def save_working_time_to_json() -> None:
     ])
     log_file["individual_files"][blend_file_name] = sum_sprints_durations_min
 
-    # if blend_file_name in log_file.get("individual_files"):
-    #     log_file["individual_files"][blend_file_name] += elapsed_time_minutes
-    # else:
-    #     log_file["individual_files"][blend_file_name]  = elapsed_time_minutes
-    
     log_file["total_minutes"] = sum( log_file.get("individual_files").values() )
     
     # save updated file
@@ -135,18 +131,17 @@ def update_timer() -> int:
     if not currently_active:
         return CHECK_INTERVAL
     
-    session_time_s = last_activity_epoch - sprint_start_epoch
-    # print('total:', session_time_s, 'active:', currently_active, 'start:', sprint_start_epoch, 'last:', last_activity_epoch)
+    # use the current time for session timer (the UI element) since it also counts as active time
+    # (inactivity returns this function earlier)
+    session_time_s = current_time_s - session_start_epoch 
 
     # if active but time of inactivity longer than timeout set to inactive
-    if current_time_s - sprint_start_epoch > INACTIVE_TIMEOUT:
+    if current_time_s - last_activity_epoch > INACTIVE_TIMEOUT:
         currently_active = False
         last_activity_epoch = None
         sprint_start_epoch = None
         return CHECK_INTERVAL
     
-    # last_activity_epoch = current_time_s
-
     return CHECK_INTERVAL
 
 def track_activity(context) -> None:
@@ -157,13 +152,14 @@ def track_activity(context) -> None:
     global last_activity_epoch, currently_active, sprint_start_epoch, session_start_epoch
 
     # reset last_activity time
+    previous_activity_epoch: int = last_activity_epoch
+
     current_time_s = int( time.time() )
     last_activity_epoch = current_time_s
 
-    print('activity', last_activity_epoch)
-    
-    # save timer state
-    save_working_time_to_json()
+    # save timer state (only if a certain time intervall is ecxeeded)
+    if last_activity_epoch - previous_activity_epoch > SAVE_INTERVAL:
+        save_working_time_to_json()
 
     # if officially in inactive state, set to active
     if not currently_active:
@@ -181,8 +177,6 @@ def ui_draw_elapsed_time(self, context) -> None:
 def register():
     global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
     global blend_file_name, blend_file_dir
-
-    # bpy.utils.register_class(TIME_OT_reset)
 
     # add timer to 3D view
     bpy.types.VIEW3D_HT_header.append( ui_draw_elapsed_time )
@@ -205,13 +199,10 @@ def register():
         blend_file_dir  = os.path.dirname(  blend_file_path )
         blend_file_name = os.path.basename( blend_file_path )
     
-    # save_working_time_to_json()
-
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
 
 def unregister():
-    # bpy.utils.unregister_class(TIME_OT_reset)
     bpy.types.VIEW3D_HT_header.remove( ui_draw_elapsed_time )
     bpy.app.timers.unregister( update_timer )
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
