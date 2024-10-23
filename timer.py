@@ -17,7 +17,7 @@ import time
 import os
 
 INACTIVE_TIMEOUT: int = 60 * 3      # seconds before counted as inactive (3 minutes)
-CHECK_INTERVAL: int = 1             # number of seconds between checking if still working (=active)
+TIMER_UPDATE_INTERVAL: int = 1             # number of seconds between checking if still working (=active)
 SAVE_INTERVAL: int  = 10            # "activities" can occurr very fast in succession. It suffices to save in time intervalls (seconds) defined by this constants
 
 session_start_epoch: int            # epoch second when "session" was started (only resets after inactivity) 
@@ -40,12 +40,12 @@ def save_working_time_to_json() -> None:
 
     # abort if currently inactive (else the counter would increase while actually inactive)
     if not currently_active:
-        return
+        return SAVE_INTERVAL
     
     # abort if no filename/directoryname is known (where should it even be saved?)
     # the reasons for this is that the blendfile is not saved yet
     if not blend_file_name:
-        return
+        return SAVE_INTERVAL
 
     log_file_path: str = os.path.join( blend_file_dir, LOG_FILE_NAME )
     log_file: dict = None
@@ -67,7 +67,7 @@ def save_working_time_to_json() -> None:
     elapsed_time_s: int = last_activity_epoch - sprint_start_epoch
 
     if elapsed_time_s == 0:
-        return
+        return SAVE_INTERVAL
 
     elapsed_time_minutes: int = elapsed_time_s / 60
     begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( sprint_start_epoch ))
@@ -115,13 +115,15 @@ def save_working_time_to_json() -> None:
     with open( log_file_path, 'w' ) as fp:
         json.dump( log_file, fp, indent=4 )
 
+    return SAVE_INTERVAL
+
 def update_timer() -> int:
     """
-    gets called every x seconds (CHECK_INTERVAL)
+    gets called every x seconds (TIMER_UPDATE_INTERVAL)
     and updates the time variables, the inactivity state and calls for the saving of the logfile
     @return: the number of seconds until next call of this function 
     """
-    global CHECK_INTERVAL, INACTIVE_TIMEOUT, currently_active
+    global TIMER_UPDATE_INTERVAL, INACTIVE_TIMEOUT, currently_active
     global last_activity_epoch, sprint_start_epoch, session_time_s
 
     # fetch current time as epoch timestamp on seoconds
@@ -129,7 +131,7 @@ def update_timer() -> int:
 
     # if inactive nothing needs to be updated
     if not currently_active:
-        return CHECK_INTERVAL
+        return TIMER_UPDATE_INTERVAL
     
     # use the current time for session timer (the UI element) since it also counts as active time
     # (inactivity returns this function earlier)
@@ -140,9 +142,9 @@ def update_timer() -> int:
         currently_active = False
         last_activity_epoch = None
         sprint_start_epoch = None
-        return CHECK_INTERVAL
+        return TIMER_UPDATE_INTERVAL
     
-    return CHECK_INTERVAL
+    return TIMER_UPDATE_INTERVAL
 
 def track_activity(context) -> None:
     """
@@ -157,22 +159,21 @@ def track_activity(context) -> None:
     current_time_s = int( time.time() )
     last_activity_epoch = current_time_s
 
-    # save timer state (only if a certain time intervall is ecxeeded)
-    if last_activity_epoch - previous_activity_epoch > SAVE_INTERVAL:
-        save_working_time_to_json()
-
     # if officially in inactive state, set to active
     if not currently_active:
         currently_active = True
         sprint_start_epoch = current_time_s # start new sprint
-        # session_start_epoch = current_time_s
 
 def ui_draw_elapsed_time(self, context) -> None:
     """draws the currently elapsed time to the Blender UI"""
     global session_time_s
-    minutes, seconds = divmod(session_time_s, 60)
-    self.layout.label(text=f"{minutes:02}:{seconds:02} min")
 
+    if session_time_s < 3600:
+        minutes, seconds = divmod(session_time_s, 60)
+        self.layout.label(text=f"{minutes:02}min {seconds:02}s")
+    else:
+        hours, seconds = divmod(session_time_s, 3600)
+        self.layout.label(text=f"{hours}h { seconds // 60 :02}min")
 
 def register():
     global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
@@ -183,6 +184,7 @@ def register():
 
     # add blender internal timer to repeatedly call the update functions
     bpy.app.timers.register( update_timer )
+    bpy.app.timers.register( save_working_time_to_json )
 
     # initalize time variables
     curr_time: int = int( time.time() )
@@ -205,6 +207,7 @@ def register():
 def unregister():
     bpy.types.VIEW3D_HT_header.remove( ui_draw_elapsed_time )
     bpy.app.timers.unregister( update_timer )
+    bpy.app.timers.unregister( save_working_time_to_json )
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
 
 if __name__ == '__main__':
