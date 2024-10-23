@@ -232,6 +232,7 @@ def register():
     # Register render handlers
     bpy.app.handlers.render_pre.append( render_start )
     bpy.app.handlers.render_complete.append( render_complete )
+    bpy.app.handlers.render_cancel.append( render_complete )
 
 def unregister():
     bpy.types.VIEW3D_HT_header.remove( ui_draw_elapsed_time )
@@ -239,6 +240,7 @@ def unregister():
     bpy.app.timers.unregister( save_working_time_to_json )
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
     bpy.app.handlers.render_pre.remove( render_start )
+    bpy.app.handlers.render_cancel.remove( render_complete )
     bpy.app.handlers.render_complete.remove( render_complete )
 
 
