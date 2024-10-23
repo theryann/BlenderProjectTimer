@@ -27,6 +27,7 @@ last_activity_epoch: int = None     # timestamp of last activity in epoch second
 session_time_s: int = None          # total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
 
 currently_active: bool = None
+currently_rendering: bool = False   # track if currently rendering cause rendering should be calculated as active time
 
 LOG_FILE_NAME: str = 'log.json'
 blend_file_name: str = None
@@ -139,6 +140,11 @@ def update_timer() -> int:
 
     # if active but time of inactivity longer than timeout set to inactive
     if current_time_s - last_activity_epoch > INACTIVE_TIMEOUT:
+        # don't do that if currently rendering tho
+        if currently_rendering:
+            last_activity_epoch = current_time_s
+            return TIMER_UPDATE_INTERVAL
+
         currently_active = False
         last_activity_epoch = None
         sprint_start_epoch = None
@@ -175,6 +181,25 @@ def ui_draw_elapsed_time(self, context) -> None:
         hours, seconds = divmod(session_time_s, 3600)
         self.layout.label(text=f"{hours}h { seconds // 60 :02}min")
 
+def render_start(scene) -> None:
+    global currently_rendering, last_activity_epoch, sprint_start_epoch, currently_active
+
+    currently_rendering = True
+    
+    current_epoch: int =  int( time.time() )
+    last_activity_epoch = current_epoch
+    
+    if sprint_start_epoch is None:
+        sprint_start_epoch = current_epoch
+    if not currently_active:
+        currently_active = True
+
+
+def render_complete(scene) -> None:
+    global currently_rendering, last_activity_epoch
+    currently_rendering = False
+    last_activity_epoch = int( time.time() )
+
 def register():
     global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
     global blend_file_name, blend_file_dir
@@ -204,11 +229,18 @@ def register():
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
 
+    # Register render handlers
+    bpy.app.handlers.render_pre.append( render_start )
+    bpy.app.handlers.render_complete.append( render_complete )
+
 def unregister():
     bpy.types.VIEW3D_HT_header.remove( ui_draw_elapsed_time )
     bpy.app.timers.unregister( update_timer )
     bpy.app.timers.unregister( save_working_time_to_json )
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
+    bpy.app.handlers.render_pre.remove( render_start )
+    bpy.app.handlers.render_complete.remove( render_complete )
+
 
 if __name__ == '__main__':
     try:
