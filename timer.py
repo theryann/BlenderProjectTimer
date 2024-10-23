@@ -60,9 +60,10 @@ def save_working_time_to_json() -> None:
     
     # load logfile
     with open( log_file_path, 'r' ) as fp:
-        log_file = json.load( log_file_path )
+        log_file = json.load( fp )
 
     elapsed_time_s: int = last_activity_s - start_time_s
+    elapsed_time_minutes: int = elapsed_time_s / 60
     begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( start_time_s ))
     end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( start_time_s + elapsed_time_s ))
 
@@ -78,7 +79,7 @@ def save_working_time_to_json() -> None:
 
         # begin_string found => so replace time elapsed
         log_file["all_sessions"][i]["endtime"] = end_string
-        log_file["all_sessions"][i]["minutes_elapsed"] = elapsed_time_s
+        log_file["all_sessions"][i]["minutes_elapsed"] = elapsed_time_minutes
 
         curr_session_found = True
         break
@@ -89,16 +90,16 @@ def save_working_time_to_json() -> None:
             "file": blend_file_name,
             "starttime": begin_string,
             "endtime": end_string,
-            "minutes_elapsed": elapsed_time_s
+            "minutes_elapsed": elapsed_time_minutes
         })
 
     # add elapsed time to counter of this blend file
     # and sum all files to new total time
 
     if blend_file_name in log_file.get("individual_files"):
-        log_file["individual_files"][blend_file_name] += elapsed_time_s
+        log_file["individual_files"][blend_file_name] += elapsed_time_minutes
     else:
-        log_file["individual_files"][blend_file_name]  = elapsed_time_s
+        log_file["individual_files"][blend_file_name]  = elapsed_time_minutes
     
     log_file["total_minutes"] = sum( log_file.get("individual_files").values() )
     
