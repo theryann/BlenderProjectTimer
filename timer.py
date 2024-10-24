@@ -125,9 +125,6 @@ def save_working_time_to_json() -> None:
     # append the render times to the sprint list and the reset the variables
     # (appending is necessary cause they should appear in the list and not just be used to calculate the total time)
     log_file["all_sprints"] += render_time_list
-
-    render_end_epoch = None
-    render_start_epoch = None
     render_time_list.clear()
 
     # calculate all rendertimes and insert them
@@ -249,6 +246,9 @@ def render_complete(scene) -> None:
             "endtime": end_string,
             "minutes_elapsed": elapsed_time_minutes
     })
+    
+    render_end_epoch = None
+    render_start_epoch = None
 
 
 def register():
