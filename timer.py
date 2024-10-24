@@ -139,9 +139,9 @@ def save_working_time_to_json() -> None:
 
     log_file["individual_files"][blend_file_name]["rendertime"] = sum_render_sprints_durations_min
     
-    # calculate total time spend (= SUM( SUM(working + rednering)  )   )
+    # calculate total time spend (= sum of WORKING time as render time is already included in the working time)
     log_file["total_minutes"] = sum([
-        file["worktime"] + file["rendertime"]
+        file["worktime"]
         for file in log_file.get("individual_files").values()
     ])
     
@@ -238,7 +238,7 @@ def render_complete(scene) -> None:
     render_end_epoch    = current_epoch
 
     begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( render_start_epoch ))
-    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( render_end_epoch - render_start_epoch ))
+    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( render_end_epoch   ))
 
     elapsed_time_minutes: int = round( (render_end_epoch - render_start_epoch) / 60, 2)
 
