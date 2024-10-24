@@ -42,6 +42,7 @@ def save_working_time_to_json() -> None:
     global sprint_start_epoch, last_activity_epoch, session_start_epoch
     global blend_file_name, blend_file_dir, LOG_FILE_NAME
     global currently_active
+    global render_time_list, render_start_epoch, render_end_epoch
 
     # abort if currently inactive (else the counter would increase while actually inactive)
     if not currently_active:
@@ -71,12 +72,12 @@ def save_working_time_to_json() -> None:
 
     # use current time since it counts as active time
     # but wouldn't it update if the last activity was before the the last time this saving function was called
-    elapsed_time_s: int = round( int( time.time() ) - sprint_start_epoch, 2 )
+    elapsed_time_s: int = int( time.time() ) - sprint_start_epoch
 
     if elapsed_time_s == 0:
         return SAVE_INTERVAL
 
-    elapsed_time_minutes: int = elapsed_time_s / 60
+    elapsed_time_minutes: int = round( elapsed_time_s / 60, 2)
     begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( sprint_start_epoch ))
     end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( sprint_start_epoch + elapsed_time_s ))
 
@@ -110,14 +111,39 @@ def save_working_time_to_json() -> None:
     # add elapsed time to counter of this blend file
     # and sum all files to new total time
     # calculate this from the list of sprint (because this save function is called periodically i can not just add to the counter)
-    sum_sprints_durations_min: float = sum([
+    sum_work_sprints_durations_min: float = sum([
         sprint.get("minutes_elapsed")
         for sprint in log_file["all_sprints"]
         if sprint["file"] == blend_file_name and sprint["type"] == "working"
     ])
-    log_file["individual_files"][blend_file_name] = sum_sprints_durations_min
 
-    log_file["total_minutes"] = sum( log_file.get("individual_files").values() )
+    if blend_file_name not in log_file["individual_files"]:
+        log_file["individual_files"][blend_file_name] = { "worktime": 0, "rendertime": 0 }
+
+    log_file["individual_files"][blend_file_name]["worktime"] = sum_work_sprints_durations_min
+
+    # append the render times to the sprint list and the reset the variables
+    # (appending is necessary cause they should appear in the list and not just be used to calculate the total time)
+    log_file["all_sprints"] += render_time_list
+
+    render_end_epoch = None
+    render_start_epoch = None
+    render_time_list.clear()
+
+    # calculate all rendertimes and insert them
+    sum_render_sprints_durations_min: float = sum([
+        sprint.get("minutes_elapsed")
+        for sprint in log_file["all_sprints"]
+        if sprint["file"] == blend_file_name and sprint["type"] == "rendering"
+    ])
+
+    log_file["individual_files"][blend_file_name]["rendertime"] = sum_render_sprints_durations_min
+    
+    # calculate total time spend (= SUM( SUM(working + rednering)  )   )
+    log_file["total_minutes"] = sum([
+        file["worktime"] + file["rendertime"]
+        for file in log_file.get("individual_files").values()
+    ])
     
     # save updated file
     with open( log_file_path, 'w' ) as fp:
@@ -211,10 +237,18 @@ def render_complete(scene) -> None:
     last_activity_epoch = current_epoch
     render_end_epoch    = current_epoch
 
+    begin_string: str = time.strftime('%FT%H:%M:%S', time.localtime( render_start_epoch ))
+    end_string: str   = time.strftime('%FT%H:%M:%S', time.localtime( render_end_epoch - render_start_epoch ))
+
+    elapsed_time_minutes: int = round( (render_end_epoch - render_start_epoch) / 60, 2)
+
     render_time_list.append({
-
+            "file": blend_file_name,
+            "type": "rendering",
+            "starttime": begin_string,
+            "endtime": end_string,
+            "minutes_elapsed": elapsed_time_minutes
     })
-
 
 
 def register():
