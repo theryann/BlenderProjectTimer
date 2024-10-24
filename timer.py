@@ -92,7 +92,7 @@ def save_working_time_to_json() -> None:
             continue
 
         # begin_string found => so replace time elapsed
-        log_file["all_sprints"][i]["endtime"] = end_string
+        log_file["all_sprints"][i]["endingime"] = end_string
         log_file["all_sprints"][i]["minutes_elapsed"] = elapsed_time_minutes
 
         curr_sprint_found = True
@@ -104,7 +104,7 @@ def save_working_time_to_json() -> None:
             "file": blend_file_name,
             "type": "working",
             "starttime": begin_string,
-            "endtime": end_string,
+            "endingime": end_string,
             "minutes_elapsed": elapsed_time_minutes
         })
 
@@ -243,7 +243,7 @@ def render_complete(scene) -> None:
             "file": blend_file_name,
             "type": "rendering",
             "starttime": begin_string,
-            "endtime": end_string,
+            "endingime": end_string,
             "minutes_elapsed": elapsed_time_minutes
     })
     
