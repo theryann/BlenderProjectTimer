@@ -16,21 +16,21 @@ import json
 import time
 import os
 
-INACTIVE_TIMEOUT: int = 60 * 3      # seconds before counted as inactive (3 minutes)
-TIMER_UPDATE_INTERVAL: int = 1             # number of seconds between checking if still working (=active)
-SAVE_INTERVAL: int  = 10            # "activities" can occurr very fast in succession. It suffices to save in time intervalls (seconds) defined by this constants
+INACTIVE_TIMEOUT: int = 60 * 3      # [seconds] before counted as inactive (3 minutes)
+TIMER_UPDATE_INTERVAL: int = 5      # [seconds] between checking if still working (=active)
+SAVE_INTERVAL: int  = 10            # [seconds] "activities" can occurr very fast in succession. It suffices to save in time intervalls (seconds) defined by this constants
 
-session_start_epoch: int            # epoch second when "session" was started (only resets after inactivity) 
-sprint_start_epoch: int = None      # epoch second to begin counting from (resets after each check-intervall)
-last_activity_epoch: int = None     # timestamp of last activity in epoch seconds
+session_start_epoch: int            # [epoch second] when "session" was started (only resets after inactivity) 
+sprint_start_epoch: int = None      # [epoch second] to begin counting from (resets after each check-intervall)
+last_activity_epoch: int = None     # [epoch second] of last activity in epoch seconds
 
-session_time_s: int = None          # total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
+session_time_s: int = None          # [seconds] total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
 
 currently_active: bool = None
 currently_rendering: bool = False   # track if currently rendering cause rendering should be calculated as active time
 
-render_start_epoch: int = None      # track the start and end of render periodes
-render_end_epoch:   int = None
+render_start_epoch: int = None      # [epoch second] track the start and end of render periodes
+render_end_epoch:   int = None      # [epoch second]
 render_time_list:   list = []       # list to track render events that happen. List gets added to the sprint list and the emptied.
 
 LOG_FILE_NAME: str = 'log.json'
