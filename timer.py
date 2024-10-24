@@ -48,9 +48,15 @@ def save_working_time_to_json() -> None:
     if not currently_active:
         return SAVE_INTERVAL
     
+    # get filename first (can be changed afterwards)
     # abort if no filename/directoryname is known (where should it even be saved?)
     # the reasons for this is that the blendfile is not saved yet
-    if not blend_file_name:
+    blend_file_path: str = bpy.data.filepath
+
+    if blend_file_path:
+        blend_file_dir  = os.path.dirname(  blend_file_path )
+        blend_file_name = os.path.basename( blend_file_path )
+    else:
         return SAVE_INTERVAL
 
     log_file_path: str = os.path.join( blend_file_dir, LOG_FILE_NAME )
@@ -189,9 +195,6 @@ def track_activity(context) -> None:
     """
     global last_activity_epoch, currently_active, sprint_start_epoch, session_start_epoch
 
-    # reset last_activity time
-    previous_activity_epoch: int = last_activity_epoch
-
     current_time_s = int( time.time() )
     last_activity_epoch = current_time_s
 
@@ -271,11 +274,6 @@ def register():
     session_time_s = 0
     currently_active = True
 
-    blend_file_path: str = bpy.data.filepath
-
-    if blend_file_path:
-        blend_file_dir  = os.path.dirname(  blend_file_path )
-        blend_file_name = os.path.basename( blend_file_path )
     
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
