@@ -29,6 +29,10 @@ session_time_s: int = None          # total time spend in project since opening 
 currently_active: bool = None
 currently_rendering: bool = False   # track if currently rendering cause rendering should be calculated as active time
 
+render_start_epoch: int = None      # track the start and end of render periodes
+render_end_epoch:   int = None
+render_time_list:   list = []       # list to track render events that happen. List gets added to the sprint list and the emptied.
+
 LOG_FILE_NAME: str = 'log.json'
 blend_file_name: str = None
 blend_file_dir: str = None
@@ -97,6 +101,7 @@ def save_working_time_to_json() -> None:
     if not curr_sprint_found:
         log_file["all_sprints"].append({
             "file": blend_file_name,
+            "type": "working",
             "starttime": begin_string,
             "endtime": end_string,
             "minutes_elapsed": elapsed_time_minutes
@@ -106,9 +111,9 @@ def save_working_time_to_json() -> None:
     # and sum all files to new total time
     # calculate this from the list of sprint (because this save function is called periodically i can not just add to the counter)
     sum_sprints_durations_min: float = sum([
-        sess.get("minutes_elapsed")
-        for sess in log_file["all_sprints"]
-        if sess["file"] == blend_file_name
+        sprint.get("minutes_elapsed")
+        for sprint in log_file["all_sprints"]
+        if sprint["file"] == blend_file_name and sprint["type"] == "working"
     ])
     log_file["individual_files"][blend_file_name] = sum_sprints_durations_min
 
@@ -184,12 +189,14 @@ def ui_draw_elapsed_time(self, context) -> None:
         self.layout.label(text=f"{hours}h { seconds // 60 :02}min")
 
 def render_start(scene) -> None:
-    global currently_rendering, last_activity_epoch, sprint_start_epoch, currently_active
+    global currently_rendering, render_start_epoch
+    global last_activity_epoch, sprint_start_epoch, currently_active
 
     currently_rendering = True
     
     current_epoch: int =  int( time.time() )
     last_activity_epoch = current_epoch
+    render_start_epoch  = current_epoch
     
     if sprint_start_epoch is None:
         sprint_start_epoch = current_epoch
@@ -197,9 +204,18 @@ def render_start(scene) -> None:
         currently_active = True
 
 def render_complete(scene) -> None:
-    global currently_rendering, last_activity_epoch
+    global currently_rendering, render_start_epoch, render_end_epoch, render_time_list, last_activity_epoch
     currently_rendering = False
-    last_activity_epoch = int( time.time() )
+
+    current_epoch: int = int( time.time() )
+    last_activity_epoch = current_epoch
+    render_end_epoch    = current_epoch
+
+    render_time_list.append({
+
+    })
+
+
 
 def register():
     global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
