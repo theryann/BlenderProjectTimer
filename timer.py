@@ -29,6 +29,8 @@ session_time_s: int = None          # [seconds] total time spend in project sinc
 currently_active: bool = None
 currently_rendering: bool = False   # track if currently rendering cause rendering should be calculated as active time
 
+label_string: str = 'active'        # [string] to be displayed in the label next to the timer
+
 render_start_epoch: int = None      # [epoch second] track the start and end of render periodes
 render_end_epoch:   int = None      # [epoch second]
 render_time_list:   list = []       # list to track render events that happen. List gets added to the sprint list and the emptied.
@@ -162,6 +164,7 @@ def update_timer() -> int:
     """
     global TIMER_UPDATE_INTERVAL, INACTIVE_TIMEOUT, currently_active
     global last_activity_epoch, sprint_start_epoch, session_time_s
+    global label_string
 
     # fetch current time as epoch timestamp on seoconds
     current_time_s: int = int( time.time() )
@@ -179,12 +182,16 @@ def update_timer() -> int:
         # don't do that if currently rendering tho
         if currently_rendering:
             last_activity_epoch = current_time_s
+            label_string = 'rendering'
             return TIMER_UPDATE_INTERVAL
 
         currently_active = False
         last_activity_epoch = None
         sprint_start_epoch = None
+        label_string = 'paused'
         return TIMER_UPDATE_INTERVAL
+    
+    label_string = 'active'
     
     return TIMER_UPDATE_INTERVAL
 
@@ -205,14 +212,14 @@ def track_activity(context) -> None:
 
 def ui_draw_elapsed_time(self, context) -> None:
     """draws the currently elapsed time to the Blender UI"""
-    global session_time_s
+    global session_time_s, label_string
 
     if session_time_s < 3600:
         minutes, seconds = divmod(session_time_s, 60)
-        self.layout.label(text=f"{minutes:02}min {seconds:02}s")
+        self.layout.label(text=f"{minutes:02}min {seconds:02}s ({label_string})")
     else:
         hours, seconds = divmod(session_time_s, 3600)
-        self.layout.label(text=f"{hours}h { seconds // 60 :02}min")
+        self.layout.label(text=f"{hours}h { seconds // 60 :02}min ({label_string})")
 
 def render_start(scene) -> None:
     global currently_rendering, render_start_epoch
