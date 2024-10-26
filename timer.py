@@ -262,9 +262,6 @@ def render_complete(scene) -> None:
 
 
 def register():
-    global sprint_start_epoch, session_time_s, last_activity_epoch, currently_active, session_start_epoch
-    global blend_file_name, blend_file_dir
-
     # add timer to 3D view
     bpy.types.VIEW3D_HT_header.append( ui_draw_elapsed_time )
 
@@ -272,16 +269,7 @@ def register():
     bpy.app.timers.register( update_timer )
     bpy.app.timers.register( save_working_time_to_json )
 
-    # initalize time variables
-    curr_time: int = int( time.time() )
-
-    session_start_epoch = curr_time
-    sprint_start_epoch  = curr_time
-    last_activity_epoch = curr_time
-    session_time_s = 0
-    currently_active = True
-
-    
+   
     # track the user input events to track the activity
     bpy.app.handlers.depsgraph_update_post.append( track_activity )
 
@@ -297,7 +285,7 @@ def unregister():
     bpy.app.handlers.depsgraph_update_post.remove( track_activity )
     bpy.app.handlers.render_pre.remove( render_start )
     bpy.app.handlers.render_cancel.remove( render_complete )
-    bpy.app.handlers.render_complete.remove( render_complete )
+    bpy.app.handlers.render_complete.remove(     )
 
 
 if __name__ == '__main__':
@@ -306,3 +294,12 @@ if __name__ == '__main__':
     except Exception as e:
         print('unregistering failed', e)
     register()
+
+    # initalize time variables
+    curr_time: int = int( time.time() )
+
+    session_start_epoch = curr_time
+    sprint_start_epoch  = curr_time
+    last_activity_epoch = curr_time
+    session_time_s = 0
+    currently_active = True
