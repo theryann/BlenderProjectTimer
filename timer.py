@@ -20,13 +20,16 @@ INACTIVE_TIMEOUT: int = 60 * 3      # [seconds] before counted as inactive (3 mi
 TIMER_UPDATE_INTERVAL: int = 5      # [seconds] between checking if still working (=active)
 SAVE_INTERVAL: int  = 10            # [seconds] "activities" can occurr very fast in succession. It suffices to save in time intervalls (seconds) defined by this constants
 
-session_start_epoch: int            # [epoch second] when "session" was started (only resets after inactivity) 
-sprint_start_epoch: int = None      # [epoch second] to begin counting from (resets after each check-intervall)
-last_activity_epoch: int = None     # [epoch second] of last activity in epoch seconds
+# initalize time variables
+curr_time: int = int( time.time() )
 
-session_time_s: int = None          # [seconds] total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
+session_start_epoch: int = curr_time    # [epoch second] when "session" was started (only resets after inactivity) 
+sprint_start_epoch:  int = curr_time    # [epoch second] to begin counting from (resets after each check-intervall)
+last_activity_epoch: int = curr_time    # [epoch second] of last activity in epoch seconds
 
-currently_active: bool = None
+session_time_s: int = 0          # [seconds] total time spend in project since opening file (minus inactivity) (only for display needed, not for logging)
+
+currently_active: bool = True
 currently_rendering: bool = False   # track if currently rendering cause rendering should be calculated as active time
 
 label_string: str = 'active'        # [string] to be displayed in the label next to the timer
@@ -295,11 +298,4 @@ if __name__ == '__main__':
         print('unregistering failed', e)
     register()
 
-    # initalize time variables
-    curr_time: int = int( time.time() )
 
-    session_start_epoch = curr_time
-    sprint_start_epoch  = curr_time
-    last_activity_epoch = curr_time
-    session_time_s = 0
-    currently_active = True
