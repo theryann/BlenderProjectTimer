@@ -194,7 +194,10 @@ def update_timer() -> int:
         label_string = 'paused'
         return TIMER_UPDATE_INTERVAL
     
-    label_string = 'active'
+    if currently_rendering:
+        label_string = 'rendering'
+    else:
+        label_string = 'active'
     
     return TIMER_UPDATE_INTERVAL
 
